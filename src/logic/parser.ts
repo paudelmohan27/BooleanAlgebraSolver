@@ -146,7 +146,7 @@ export function tokenize(expr: string): Token[] {
         // Wait, what if the user wrote "VarA"? We treat it as V, a, r, A.
         // Let's emit each alphabetical character as a VAR token.
         for (let k = 0; k < word.length; k++) {
-          tokens.push({ type: 'VAR', val: word[k].toUpperCase(), pos: i + k });
+          tokens.push({ type: 'VAR', val: word[k], pos: i + k });
         }
         i = j;
       }

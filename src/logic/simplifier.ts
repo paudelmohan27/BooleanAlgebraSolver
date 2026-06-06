@@ -188,7 +188,8 @@ export function simplifyExpression(
     }
   }
 
-  // Phase 3: Build simplified expression string
+  // Phase 3: Build simplified expression string from selectedPIs only
+  // selectedPIs = essential PIs + greedy picks = minimal cover
   const termStrings = selectedPIs.map((pi) => {
     let termStr = '';
     for (let i = 0; i < numVars; i++) {
