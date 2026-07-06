@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, ChevronRight, ChevronDown } from 'lucide-react';
+import { BookOpen, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Topic {
   id: string;
