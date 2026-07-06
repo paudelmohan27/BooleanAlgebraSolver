@@ -1,13 +1,12 @@
 import type { ASTNode } from '../logic/parser';
 import { useAppStore } from '../store/appStore';
-import { BarChart3, Settings, Cpu } from 'lucide-react';
+import { BarChart3, Hash, Rows3, GitBranch, Layers, Cpu } from 'lucide-react';
 
 function getDepth(node: ASTNode | null): number {
   if (!node) return 0;
   if (node.type === 'VAR') return 0;
   return 1 + Math.max(getDepth(node.left ?? null), getDepth(node.right ?? null));
 }
-
 function getGateCount(node: ASTNode | null): number {
   if (!node) return 0;
   if (node.type === 'VAR') return 0;
@@ -22,74 +21,123 @@ export default function StatsPanel() {
   const depth = parsedAST ? getDepth(parsedAST) : 0;
   const gateCount = parsedAST ? getGateCount(parsedAST) : 0;
 
-  let complexity: 'Simple' | 'Medium' | 'Complex' = 'Simple';
-  let complexityStyle = 'text-emerald-700 bg-emerald-100 border-emerald-200';
-  if (gateCount > 5 || numVars > 4) {
-    complexity = 'Complex';
-    complexityStyle = 'text-red-700 bg-red-100 border-red-200';
-  } else if (gateCount > 2 || numVars > 2) {
-    complexity = 'Medium';
-    complexityStyle = 'text-amber-700 bg-amber-100 border-amber-200';
-  }
+  const complexity: 'Simple' | 'Medium' | 'Complex' =
+    gateCount > 5 || numVars > 4 ? 'Complex' :
+    gateCount > 2 || numVars > 2 ? 'Medium'  : 'Simple';
 
   if (!parsedAST) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl h-full min-h-48">
-        <BarChart3 className="h-8 w-8 mb-3 text-slate-300" />
-        <p className="font-semibold text-sm text-slate-500">No expression metrics</p>
-        <p className="text-xs mt-1">Enter an expression to see stats.</p>
+      <div className="glass flex flex-col items-center justify-center p-8 min-h-48 animate-float-in">
+        <BarChart3 className="h-10 w-10 mb-3" style={{ color: 'var(--border)' }} />
+        <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>No metrics yet</p>
+        <p className="text-xs mt-1 text-center" style={{ color: 'var(--text-dim)' }}>
+          Enter a valid expression to see stats.
+        </p>
       </div>
     );
   }
 
   const stats = [
-    { label: 'Variables', value: numVars },
-    { label: 'Truth Rows', value: numRows },
-    { label: 'AST Depth', value: depth },
-    { label: 'Gate Count', value: gateCount },
+    { label: 'Variables',   value: numVars,    icon: Hash      },
+    { label: 'Truth Rows',  value: numRows,     icon: Rows3     },
+    { label: 'AST Depth',   value: depth,       icon: GitBranch },
+    { label: 'Gate Count',  value: gateCount,   icon: Layers    },
   ];
 
+  const complexityStyle = {
+    Simple:  { color: 'var(--success)', bg: 'var(--success-bg)', border: 'rgba(34,197,94,0.25)' },
+    Medium:  { color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'rgba(245,158,11,0.25)' },
+    Complex: { color: 'var(--error)',   bg: 'var(--error-bg)',   border: 'rgba(239,68,68,0.25)'  },
+  }[complexity];
+
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col gap-5">
-      <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
-        <Settings className="h-4 w-4 text-slate-400" />
-        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Expression Metrics</h4>
+    <div className="glass p-6 flex flex-col gap-5 animate-float-in">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: 'var(--primary-bg)', border: '1px solid var(--primary-border)' }}
+        >
+          <BarChart3 className="h-4 w-4" style={{ color: 'var(--primary)' }} />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold" style={{ color: 'var(--text)' }}>Circuit Metrics</h4>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Expression analysis</p>
+        </div>
       </div>
 
+      {/* Stat grid */}
       <div className="grid grid-cols-2 gap-3">
-        {stats.map(({ label, value }) => (
-          <div key={label} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide block mb-1">{label}</span>
-            <span className="text-2xl font-black text-slate-800 font-mono">{value}</span>
+        {stats.map(({ label, value, icon: Icon }) => (
+          <div key={label} className="p-4 rounded-xl"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="section-label">{label}</span>
+              <Icon className="h-3.5 w-3.5" style={{ color: 'var(--text-dim)' }} />
+            </div>
+            <span
+              className="text-3xl font-black mono"
+              style={{ color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {value}
+            </span>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-        <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-          <Cpu className="h-3.5 w-3.5 text-violet-500" /> Complexity
+      {/* Complexity */}
+      <div className="flex items-center justify-between p-3.5 rounded-xl"
+        style={{ background: complexityStyle.bg, border: `1px solid ${complexityStyle.border}` }}
+      >
+        <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <Cpu className="h-3.5 w-3.5" /> Complexity
         </span>
-        <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-lg border ${complexityStyle}`}>
+        <span className="text-xs font-black uppercase tracking-wider"
+          style={{ color: complexityStyle.color }}
+        >
           {complexity}
         </span>
       </div>
 
-      <div className="pt-4 border-t border-slate-100">
-        <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-2">
-          <span>Optimization</span>
-          <span className="text-violet-600 font-mono">{reductionPercentage}% reduction</span>
+      {/* Optimization bar */}
+      <div className="pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span style={{ color: 'var(--text-muted)' }}>Optimization</span>
+          <span
+            className="font-bold mono"
+            style={{ color: 'var(--primary-hover)', fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            {reductionPercentage}% reduction
+          </span>
         </div>
-        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
+        {/* Track */}
+        <div className="w-full h-1.5 rounded-full overflow-hidden"
+          style={{ background: 'var(--border)' }}
+        >
           <div
-            className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${reductionPercentage}%` }}
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${reductionPercentage}%`,
+              background: 'linear-gradient(90deg, var(--primary), var(--primary-hover))',
+              boxShadow: reductionPercentage > 0 ? '0 0 8px rgba(59,130,246,0.5)' : 'none',
+            }}
           />
         </div>
-        <div className="mt-3 bg-violet-50 border border-violet-200 p-3 rounded-lg">
-          <p className="text-xs font-medium text-violet-800 font-mono">
-            Simplified: <span className="font-bold">{simplifiedExpression || '0'}</span>
-          </p>
-        </div>
+
+        {/* Simplified expression */}
+        {simplifiedExpression && (
+          <div className="mt-3 p-3 rounded-xl"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+          >
+            <p className="section-label mb-1.5">Simplified</p>
+            <p
+              className="font-bold text-sm mono"
+              style={{ color: 'var(--primary-hover)', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {simplifiedExpression}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

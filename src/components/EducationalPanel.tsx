@@ -1,243 +1,235 @@
 import { useState } from 'react';
-import { BookOpen, Award, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronRight, ChevronDown } from 'lucide-react';
 
-interface TutorialTopic {
+interface Topic {
+  id: string;
   title: string;
-  category: string;
-  content: React.ReactNode;
+  content: {
+    intro: string;
+    sections: {
+      heading: string;
+      body: string;
+      example?: string;
+    }[];
+  };
 }
 
-export default function EducationalPanel() {
-  const [activeTopicIdx, setActiveTopicIdx] = useState(0);
+const TOPICS: Topic[] = [
+  {
+    id: 'basics',
+    title: 'Boolean Algebra Basics',
+    content: {
+      intro: 'Boolean algebra is a branch of algebra dealing with values that are either true (1) or false (0), forming the mathematical foundation of digital logic.',
+      sections: [
+        { heading: 'AND Operation  (·)', body: 'Outputs 1 only when all inputs are 1.', example: 'A · B = 1  iff  A=1 and B=1' },
+        { heading: 'OR Operation   (+)', body: 'Outputs 1 when at least one input is 1.', example: 'A + B = 1  iff  A=1 or B=1' },
+        { heading: "NOT Operation  (')", body: 'Inverts the input.', example: "A' = 1  iff  A = 0" },
+      ],
+    },
+  },
+  {
+    id: 'laws',
+    title: 'Boolean Laws & Theorems',
+    content: {
+      intro: 'These identities let you simplify any boolean expression algebraically.',
+      sections: [
+        { heading: 'Identity',       body: 'A + 0 = A   and   A · 1 = A' },
+        { heading: 'Null',           body: 'A + 1 = 1   and   A · 0 = 0' },
+        { heading: 'Complement',     body: "A + A' = 1  and   A · A' = 0" },
+        { heading: 'Idempotent',     body: 'A + A = A   and   A · A = A' },
+        { heading: 'Commutativity',  body: 'A + B = B + A   and   A · B = B · A' },
+        { heading: 'Associativity',  body: '(A+B)+C = A+(B+C)   and   (A·B)·C = A·(B·C)' },
+        { heading: "De Morgan's",    body: "(A+B)' = A'·B'   and   (A·B)' = A'+B'",  example: "Complement flips + ↔ ·" },
+        { heading: 'Absorption',     body: "A + A·B = A   and   A·(A+B) = A",         example: 'A absorbs any term containing A' },
+        { heading: 'Consensus',      body: "AB + A'C + BC = AB + A'C",                example: 'BC is redundant' },
+      ],
+    },
+  },
+  {
+    id: 'kmap',
+    title: 'Karnaugh Maps',
+    content: {
+      intro: 'A K-Map is a grid-based visual method for minimizing boolean functions up to 4 variables.',
+      sections: [
+        { heading: 'Layout',   body: 'Cells are arranged in Gray Code order so adjacent cells differ in exactly one variable.' },
+        { heading: 'Grouping', body: 'Group adjacent 1s in rectangles whose size is a power of 2 (1, 2, 4, 8…). Larger groups → simpler terms.' },
+        { heading: 'Wrapping', body: 'The K-Map wraps around: the top row is adjacent to the bottom, and the left column to the right.' },
+        { heading: "Don't Cares", body: "Mark cells X when the output is irrelevant. X cells can be included in groups to make them larger." },
+      ],
+    },
+  },
+  {
+    id: 'qm',
+    title: 'Quine-McCluskey Algorithm',
+    content: {
+      intro: 'An algorithmic, tabular minimization method that works for any number of variables — the basis for electronic CAD tools.',
+      sections: [
+        { heading: 'Step 1 — List Minterms',       body: 'Convert each minterm to binary and group by the number of 1 bits.' },
+        { heading: 'Step 2 — Combine Pairs',        body: 'Repeatedly combine pairs of terms that differ in exactly one bit, replacing the differing bit with a dash (−).' },
+        { heading: 'Step 3 — Prime Implicants',     body: 'Any term that cannot be combined further is a prime implicant.' },
+        { heading: 'Step 4 — Essential PIs',        body: 'Build a cover chart. A PI is essential if it uniquely covers a minterm. Include all essential PIs.' },
+        { heading: 'Step 5 — Minimal Cover',        body: "Use a greedy or Petrick\u2019s method to cover remaining minterms with the fewest additional PIs." },
+      ],
+    },
+  },
+  {
+    id: 'gates',
+    title: 'Logic Gates & Circuits',
+    content: {
+      intro: 'Every boolean expression can be realized as a network of logic gates.',
+      sections: [
+        { heading: 'AND Gate',  body: 'Two or more inputs; outputs 1 only when all inputs are 1.  Symbol: D-shape.' },
+        { heading: 'OR Gate',   body: 'Outputs 1 when any input is 1.  Symbol: curved-back D.' },
+        { heading: 'NOT Gate',  body: 'Inverts a single input.  Symbol: triangle with bubble.' },
+        { heading: 'NAND Gate', body: 'AND followed by NOT.  Universal gate — any logic can be built from NANDs alone.' },
+        { heading: 'NOR Gate',  body: 'OR followed by NOT.  Also universal.' },
+        { heading: 'XOR Gate',  body: 'Outputs 1 when an odd number of inputs are 1.  Used in adders.' },
+        { heading: 'Wire colors', body: 'In this app: active HIGH → blue, active LOW → grey.', example: 'Hover gates in the Circuit tab to inspect values.' },
+      ],
+    },
+  },
+  {
+    id: 'sop-pos',
+    title: 'SOP and POS Forms',
+    content: {
+      intro: 'Two canonical forms for representing boolean functions.',
+      sections: [
+        { heading: 'Sum of Products (SOP)', body: 'OR of AND terms. Each AND term (minterm) covers one row with F=1.', example: "F = A'B + AB' + AB" },
+        { heading: 'Product of Sums (POS)', body: 'AND of OR terms. Each OR term (maxterm) covers one row with F=0.', example: "F = (A+B)(A'+B)" },
+        { heading: 'Canonical vs Minimal',  body: 'Canonical forms include every variable in every term. Minimal forms are simplified — fewer literals, fewer gates.' },
+      ],
+    },
+  },
+];
 
-  const topics: TutorialTopic[] = [
-    {
-      title: 'Boolean Algebra',
-      category: 'Foundations',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>
-            <strong>Boolean Algebra</strong> is a branch of mathematics where variable values are <em>true</em> and <em>false</em>,
-            denoted as <strong>1</strong> and <strong>0</strong>. Unlike numerical algebra, it deals with logical relationships.
-          </p>
-          <div className="bg-violet-50 border border-violet-200 p-4 rounded-xl">
-            <h5 className="font-bold text-violet-800 mb-3 text-xs uppercase tracking-wider">Fundamental Laws</h5>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-xs text-violet-700">
-              <li>• Identity: A + 0 = A,  A · 1 = A</li>
-              <li>• Annulment: A + 1 = 1, A · 0 = 0</li>
-              <li>• Idempotent: A + A = A, A · A = A</li>
-              <li>• Complement: A + A' = 1, A · A' = 0</li>
-              <li>• Double Negation: (A')' = A</li>
-              <li>• De Morgan's: (A+B)' = A'B'</li>
-            </ul>
-          </div>
-          <p>
-            De Morgan's laws are critical in digital design — they let engineers convert complex expressions into
-            equivalent forms suitable for universal gate (NAND/NOR) construction.
-          </p>
-        </div>
-      ),
-    },
-    {
-      title: 'Truth Tables',
-      category: 'Foundations',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>
-            A <strong>Truth Table</strong> lists all possible combinations of inputs and their resulting outputs.
-            For <em>n</em> variables there are exactly <strong>2<sup>n</sup></strong> rows.
-          </p>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-slate-100 border-b border-slate-200">
-                <tr>
-                  {['A', 'B', 'AND (A·B)', 'OR (A+B)'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 font-bold text-slate-500 uppercase text-xs">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {[[0,0,0,0],[0,1,0,1],[1,0,0,1],[1,1,1,1]].map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    {row.map((v, j) => (
-                      <td key={j} className={`px-4 py-2.5 font-bold ${
-                        j >= 2 ? (v ? 'text-emerald-600' : 'text-slate-400') : 'text-slate-600'
-                      }`}>{v}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p>
-            You can compare two expressions by checking if their output columns match for all input rows — that's
-            exactly what the Compare Mode in the Truth Table tab does.
-          </p>
-        </div>
-      ),
-    },
-    {
-      title: 'Logic Gates',
-      category: 'Hardware',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>
-            <strong>Logic Gates</strong> are the fundamental building blocks of digital systems. They implement Boolean
-            functions by accepting binary inputs and producing a binary output.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {[
-              { name: 'AND Gate', desc: 'Outputs 1 ONLY when all inputs are 1. Symbol: A·B', color: 'violet' },
-              { name: 'OR Gate', desc: 'Outputs 1 when at least one input is 1. Symbol: A+B', color: 'indigo' },
-              { name: 'NOT Gate', desc: "Inverts the input. Also called an inverter. Symbol: A'", color: 'blue' },
-              { name: 'XOR Gate', desc: 'Outputs 1 when inputs are DIFFERENT. Symbol: A⊕B', color: 'cyan' },
-              { name: 'NAND Gate', desc: 'Inverted AND — universal gate. Symbol: A↑B', color: 'emerald' },
-              { name: 'NOR Gate', desc: 'Inverted OR — universal gate. Symbol: A↓B', color: 'teal' },
-            ].map((g) => (
-              <div key={g.name} className={`p-3.5 bg-${g.color}-50 border border-${g.color}-200 rounded-xl`}>
-                <h6 className={`font-bold text-xs text-${g.color}-800 mb-1`}>{g.name}</h6>
-                <p className={`text-xs text-${g.color}-700`}>{g.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Karnaugh Maps',
-      category: 'Methods',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>
-            A <strong>Karnaugh Map (K-Map)</strong> is a graphical method to simplify Boolean expressions.
-            Cells are arranged in <strong>Gray Code</strong> order so adjacent cells differ by exactly one bit.
-          </p>
-          <div className="bg-violet-50 border border-violet-200 p-4 rounded-xl">
-            <h5 className="font-bold text-violet-800 mb-3 text-xs uppercase tracking-wider">Grouping Rules</h5>
-            <ul className="space-y-2 text-xs text-violet-700">
-              <li className="flex items-start gap-1.5">• Groups must contain only 1s, in sizes of powers of 2 (1, 2, 4, 8).</li>
-              <li className="flex items-start gap-1.5">• Cells may be grouped horizontally or vertically (no diagonals).</li>
-              <li className="flex items-start gap-1.5">• Groups can wrap around edges (toroidal adjacency).</li>
-              <li className="flex items-start gap-1.5">• Seek the largest and fewest groups possible for maximum simplification.</li>
-            </ul>
-          </div>
-          <p>
-            Each group corresponds to one product term in the final simplified SOP expression. Variables that
-            don't change within a group are eliminated.
-          </p>
-        </div>
-      ),
-    },
-    {
-      title: 'SOP & POS Forms',
-      category: 'Foundations',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>Any Boolean function can be expressed in two canonical standard forms:</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-              <span className="font-extrabold text-xs text-emerald-700 uppercase tracking-wide">Sum of Products (SOP)</span>
-              <p className="text-xs text-emerald-700 mt-2">
-                ORing together minterms (rows where output = 1). Each term is an AND of variables.
-              </p>
-              <code className="block mt-3 bg-white border border-emerald-200 p-2 rounded text-xs font-mono text-emerald-800">
-                F = A'B + AB'
-              </code>
-            </div>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <span className="font-extrabold text-xs text-blue-700 uppercase tracking-wide">Product of Sums (POS)</span>
-              <p className="text-xs text-blue-700 mt-2">
-                ANDing together maxterms (rows where output = 0). Each term is an OR of variables.
-              </p>
-              <code className="block mt-3 bg-white border border-blue-200 p-2 rounded text-xs font-mono text-blue-800">
-                F = (A+B)(A'+B')
-              </code>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Universal Gates',
-      category: 'Hardware',
-      content: (
-        <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
-          <p>
-            <strong>NAND</strong> and <strong>NOR</strong> are called <strong>Universal Gates</strong> because any Boolean
-            function can be constructed using only one of these gate types.
-          </p>
-          <div className="bg-violet-50 border border-violet-200 p-4 rounded-xl">
-            <h5 className="font-bold text-violet-800 mb-3 text-xs uppercase tracking-wider">NAND Equivalents</h5>
-            <ul className="space-y-2 text-xs text-violet-700 font-mono">
-              <li>• NOT A &nbsp;&nbsp; = A NAND A</li>
-              <li>• A AND B = (A NAND B) NAND (A NAND B)</li>
-              <li>• A OR B &nbsp;= (A NAND A) NAND (B NAND B)</li>
-            </ul>
-          </div>
-          <p>
-            In practice, NAND-only designs dominate CMOS chip manufacturing because they require fewer transistors
-            and provide superior noise margins.
-          </p>
-        </div>
-      ),
-    },
-  ];
+export default function EducationalPanel() {
+  const [activeTopic, setActiveTopic] = useState<string | null>('basics');
+  const [expandedSection, setExpandedSection] = useState<number | null>(null);
+
+  const topic = TOPICS.find(t => t.id === activeTopic);
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-float-in">
 
-      <div className="mb-6 flex items-center gap-2.5">
-        <div className="h-8 w-8 bg-violet-100 rounded-lg flex items-center justify-center">
-          <BookOpen className="h-4 w-4 text-violet-600" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-slate-800">Learn Boolean Logic</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Explore theory behind digital logic design</p>
+      {/* ── Sidebar ── */}
+      <div className="md:col-span-1">
+        <div className="glass p-4 sticky top-28">
+          <div className="flex items-center gap-2 mb-4 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'var(--primary-bg)', border: '1px solid var(--primary-border)' }}
+            >
+              <BookOpen className="h-3.5 w-3.5" style={{ color: 'var(--primary)' }} />
+            </div>
+            <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Learn</span>
+          </div>
+
+          <nav className="space-y-1">
+            {TOPICS.map(t => {
+              const isActive = activeTopic === t.id;
+              return (
+                <button key={t.id}
+                  onClick={() => { setActiveTopic(t.id); setExpandedSection(null); }}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-left text-xs font-medium cursor-pointer transition-all"
+                  style={isActive ? {
+                    background: 'var(--primary-bg)',
+                    border: '1px solid var(--primary-border)',
+                    color: 'var(--primary-hover)',
+                  } : {
+                    background: 'transparent',
+                    border: '1px solid transparent',
+                    color: 'var(--text-muted)',
+                  }}
+                  onMouseEnter={e => { if (!isActive) (e.currentTarget.style.background = 'var(--surface-hover)'); }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget.style.background = 'transparent'); }}
+                >
+                  <span className="leading-snug">{t.title}</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* ── Content ── */}
+      <div className="md:col-span-3">
+        {topic ? (
+          <div className="glass p-6 animate-float-in" key={topic.id}>
+            {/* Title */}
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text)' }}>{topic.title}</h2>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-muted)' }}>
+              {topic.content.intro}
+            </p>
 
-        {/* Sidebar */}
-        <div className="md:col-span-1 flex flex-row md:flex-col overflow-x-auto md:overflow-visible gap-2 pb-3 md:pb-0 md:border-r border-b md:border-b-0 border-slate-200 md:pr-4">
-          {topics.map((topic, idx) => {
-            const isActive = idx === activeTopicIdx;
-            return (
-              <button
-                key={topic.title}
-                onClick={() => setActiveTopicIdx(idx)}
-                className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-left shrink-0 transition-all duration-150 cursor-pointer w-full ${
-                  isActive
-                    ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent'
-                }`}
-              >
-                <div className="flex flex-col">
-                  <span className={`text-[9px] uppercase tracking-widest font-bold ${isActive ? 'text-violet-200' : 'text-slate-400'}`}>
-                    {topic.category}
-                  </span>
-                  <span className="mt-0.5 font-bold">{topic.title}</span>
-                </div>
-                <ChevronRight className={`h-4 w-4 hidden md:block opacity-50 transition-transform ${isActive ? 'translate-x-0.5' : ''}`} />
-              </button>
-            );
-          })}
-        </div>
+            {/* Sections */}
+            <div className="space-y-2">
+              {topic.content.sections.map((sec, idx) => {
+                const isOpen = expandedSection === idx;
+                return (
+                  <div key={idx}
+                    className="rounded-xl overflow-hidden transition-all duration-150"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                  >
+                    <button
+                      onClick={() => setExpandedSection(isOpen ? null : idx)}
+                      className="w-full flex items-center justify-between gap-3 p-4 text-left cursor-pointer transition-all"
+                      style={{ background: isOpen ? 'rgba(59,130,246,0.04)' : 'transparent' }}
+                      onMouseEnter={e => { if (!isOpen) (e.currentTarget.style.background = 'var(--surface-hover)'); }}
+                      onMouseLeave={e => { if (!isOpen) (e.currentTarget.style.background = 'transparent'); }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Number */}
+                        <div className="h-6 w-6 rounded-full shrink-0 flex items-center justify-center text-xs font-bold"
+                          style={isOpen ? {
+                            background: 'var(--primary)',
+                            color: '#fff',
+                          } : {
+                            background: 'var(--surface-hover)',
+                            border: '1px solid var(--border)',
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
+                        <span className="text-sm font-semibold"
+                          style={{ color: isOpen ? 'var(--primary-hover)' : 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}
+                        >
+                          {sec.heading}
+                        </span>
+                      </div>
+                      {isOpen
+                        ? <ChevronUp   className="h-4 w-4 shrink-0" style={{ color: 'var(--primary)' }} />
+                        : <ChevronDown className="h-4 w-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
+                      }
+                    </button>
 
-        {/* Content */}
-        <div className="md:col-span-3 flex flex-col justify-between min-h-72">
-          <div>
-            <div className="flex items-center gap-1.5 text-xs text-violet-600 font-bold uppercase tracking-widest mb-2">
-              <Award className="h-3.5 w-3.5" /> {topics[activeTopicIdx].category}
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-1 animate-float-in"
+                        style={{ borderTop: '1px solid var(--border)' }}
+                      >
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                          {sec.body}
+                        </p>
+                        {sec.example && (
+                          <div className="mt-3 code-block">
+                            <code style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                              {sec.example}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <h4 className="text-2xl font-black text-slate-900 mb-5">{topics[activeTopicIdx].title}</h4>
-            {topics[activeTopicIdx].content}
           </div>
-          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center gap-2 text-xs text-emerald-600 font-semibold">
-            <CheckCircle2 className="h-4 w-4 shrink-0" /> Verified curriculum content
+        ) : (
+          <div className="glass flex flex-col items-center justify-center p-12">
+            <BookOpen className="h-10 w-10 mb-3" style={{ color: 'var(--border)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Select a topic from the left panel</p>
           </div>
-        </div>
-
+        )}
       </div>
     </div>
   );

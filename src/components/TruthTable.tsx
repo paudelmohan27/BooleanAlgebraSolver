@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useAppStore } from '../store/appStore';
 import { evaluateAST, parseExpression, getVariables } from '../logic/parser';
 import type { ASTNode } from '../logic/parser';
-import { FileText, Download, Search, ArrowUpDown, ChevronDown, ChevronUp, Scale, CheckCircle2, XCircle } from 'lucide-react';
+import { Download, Search, ArrowUpDown, ChevronDown, ChevronUp, Scale, CheckCircle2, XCircle, Table2, FileText } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 interface TableRow {
@@ -15,53 +15,42 @@ interface TableRow {
 export default function TruthTable() {
   const { expression, parsedAST, variables } = useAppStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortCol, setSortCol] = useState<number | 'out' | 'compare' | null>(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [compareMode, setCompareMode] = useState(false);
-  const [compareExpr, setCompareExpr] = useState('');
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [sortCol, setSortCol]           = useState<number | 'out' | 'compare' | null>(null);
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('asc');
+  const [compareMode, setCompareMode]   = useState(false);
+  const [compareExpr, setCompareExpr]   = useState('');
 
-  // Parse second expression
   const { compareAST, compareVars, compareError } = useMemo<{
-    compareAST: ASTNode | null;
-    compareVars: string[];
-    compareError: string | null;
+    compareAST: ASTNode | null; compareVars: string[]; compareError: string | null;
   }>(() => {
     if (!compareMode || !compareExpr.trim()) return { compareAST: null, compareVars: [], compareError: null };
     try {
       const ast = parseExpression(compareExpr);
-      const vars = getVariables(ast);
-      return { compareAST: ast, compareVars: vars, compareError: null };
+      return { compareAST: ast, compareVars: getVariables(ast), compareError: null };
     } catch (e: unknown) {
-      return { compareAST: null, compareVars: [], compareError: (e as Error).message || 'Invalid expression' };
+      return { compareAST: null, compareVars: [], compareError: (e as Error).message || 'Invalid' };
     }
   }, [compareMode, compareExpr]);
 
-  // Union of all variables
   const allVariables = useMemo(() => {
     const s = new Set([...variables, ...(compareMode ? compareVars : [])]);
     return Array.from(s).sort();
   }, [variables, compareVars, compareMode]);
 
-  // Compute truth table rows
   const combinations = useMemo<TableRow[]>(() => {
-    if (!parsedAST || allVariables.length === 0) return [];
-    if (allVariables.length > 10) return [];
-
+    if (!parsedAST || allVariables.length === 0 || allVariables.length > 10) return [];
     return Array.from({ length: Math.pow(2, allVariables.length) }, (_, i) => {
       const vals: boolean[] = [];
       const values: Record<string, boolean> = {};
       allVariables.forEach((v, vIdx) => {
         const bit = ((i >> (allVariables.length - 1 - vIdx)) & 1) === 1;
-        vals.push(bit);
-        values[v] = bit;
+        vals.push(bit); values[v] = bit;
       });
       let out = false;
       try { out = evaluateAST(parsedAST, values); } catch { /* noop */ }
       let outCompare: boolean | null = null;
-      if (compareMode && compareAST) {
-        try { outCompare = evaluateAST(compareAST, values); } catch { /* noop */ }
-      }
+      if (compareMode && compareAST) try { outCompare = evaluateAST(compareAST, values); } catch { /* noop */ }
       return { index: i, vals, out, outCompare };
     });
   }, [parsedAST, allVariables, compareMode, compareAST]);
@@ -108,136 +97,115 @@ export default function TruthTable() {
       csv += row + '\n';
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    Object.assign(document.createElement('a'), { href: url, download: `truth_table_${safeFilename}.csv` }).click();
+    Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `truth_table_${safeFilename}.csv` }).click();
   };
 
   const handleExportJSON = () => {
     if (!allVariables.length) return;
     const data = {
-      expression, compareExpression: compareMode ? compareExpr : undefined,
-      isEquivalent: compareMode ? isEquivalent : undefined,
-      variables: allVariables,
+      expression, variables: allVariables,
       rows: combinations.map((r) => {
         const inputs: Record<string, number> = {};
         allVariables.forEach((v, i) => { inputs[v] = r.vals[i] ? 1 : 0; });
-        const row: Record<string, unknown> = { inputs, F1: r.out ? 1 : 0 };
-        if (compareMode && compareAST && r.outCompare !== null) { row.F2 = r.outCompare ? 1 : 0; row.match = r.out === r.outCompare; }
-        return row;
+        return { inputs, F1: r.out ? 1 : 0 };
       }),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    Object.assign(document.createElement('a'), { href: url, download: `truth_table_${safeFilename}.json` }).click();
+    Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `truth_table_${safeFilename}.json` }).click();
   };
 
   const handleExportPDF = () => {
     if (!allVariables.length) return;
     const doc = new jsPDF();
+    doc.setFont('Helvetica', 'bold'); doc.setFontSize(16);
+    doc.text('Truth Table — Logic Lab', 14, 18);
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
+    doc.text(`F1: ${expression}`, 14, 26);
+    let y = 34;
+    const colW = Math.min(20, 170 / (allVariables.length + 1));
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('Truth Table Report', 14, 18);
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(10);
-    let y = 26;
-    doc.text(`F1: ${expression}`, 14, y); y += 6;
-    if (compareMode && compareAST) {
-      doc.text(`F2: ${compareExpr}`, 14, y); y += 6;
-      doc.text(`Equivalent: ${isEquivalent ? 'Yes' : 'No'}`, 14, y); y += 6;
-    }
-    y += 4;
-    const colW = Math.min(20, 170 / (allVariables.length + (compareMode && compareAST ? 3 : 1)));
-    doc.setFont('Helvetica', 'bold');
-    let x = 14;
-    doc.text('Row', x, y); x += colW;
+    let x = 14; doc.text('#', x, y); x += colW;
     allVariables.forEach((v) => { doc.text(v, x, y); x += colW; });
-    doc.text('F1', x, y); x += colW;
-    if (compareMode && compareAST) { doc.text('F2', x, y); x += colW; doc.text('=', x, y); }
+    doc.text('F1', x, y);
     y += 2; doc.line(14, y, 196, y); y += 5;
     doc.setFont('Helvetica', 'normal');
     combinations.forEach((r) => {
-      x = 14;
-      doc.text(r.index.toString(), x, y); x += colW;
+      x = 14; doc.text(r.index.toString(), x, y); x += colW;
       r.vals.forEach((v) => { doc.text(v ? '1' : '0', x, y); x += colW; });
-      doc.text(r.out ? '1' : '0', x, y); x += colW;
-      if (compareMode && compareAST && r.outCompare !== null) { doc.text(r.outCompare ? '1' : '0', x, y); x += colW; doc.text(r.out === r.outCompare ? '✓' : '✗', x, y); }
-      y += 6;
-      if (y > 275) { doc.addPage(); y = 20; }
+      doc.text(r.out ? '1' : '0', x, y);
+      y += 6; if (y > 275) { doc.addPage(); y = 20; }
     });
     doc.save(`truth_table_${safeFilename}.pdf`);
   };
 
   const SortIcon = ({ col }: { col: number | 'out' | 'compare' }) =>
-    sortCol === col ? (
-      sortDir === 'asc' ? <ChevronUp className="h-3 w-3 text-violet-600" /> : <ChevronDown className="h-3 w-3 text-violet-600" />
-    ) : <ArrowUpDown className="h-3 w-3 text-slate-300" />;
+    sortCol === col
+      ? sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+      : <ArrowUpDown className="h-3 w-3" style={{ color: 'var(--text-dim)' }} />;
 
   if (!parsedAST) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
-        <FileText className="h-10 w-10 mb-3 text-slate-300" />
-        <p className="font-semibold text-base text-slate-500">No active expression</p>
-        <p className="text-sm mt-1">Enter an expression on the Home tab first.</p>
+      <div className="glass flex flex-col items-center justify-center p-12 animate-float-in">
+        <Table2 className="h-10 w-10 mb-3" style={{ color: 'var(--border)' }} />
+        <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>No active expression</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-dim)' }}>Enter an expression on the Home tab first.</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="glass p-6 animate-float-in">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
-        <div>
-          <h3 className="text-lg font-bold text-slate-800">Truth Table</h3>
-          <p className="text-xs text-slate-500 mt-1 font-mono">
-            F1: <span className="text-violet-600 font-semibold">{expression}</span>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={() => setCompareMode(!compareMode)}
-            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              compareMode
-                ? 'bg-violet-50 border-violet-300 text-violet-700'
-                : 'bg-white border-slate-300 text-slate-600 hover:border-violet-300 hover:text-violet-700'
-            }`}
+      {/* Header row */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: 'var(--primary-bg)', border: '1px solid var(--primary-border)' }}
           >
-            <Scale className="h-3.5 w-3.5" /> {compareMode ? 'Exit Compare' : 'Compare'}
+            <Table2 className="h-4 w-4" style={{ color: 'var(--primary)' }} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text)' }}>Truth Table</h3>
+            <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+              F1: {expression}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <button onClick={() => setCompareMode(!compareMode)}
+            className={compareMode ? 'btn-primary' : 'btn-secondary'}
+          >
+            <Scale className="h-3.5 w-3.5" />
+            {compareMode ? 'Exit Compare' : 'Compare'}
           </button>
-          <div className="h-6 w-px bg-slate-200" />
-          <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-slate-400 rounded-lg text-xs font-semibold text-slate-600 active:scale-95 transition-all cursor-pointer">
-            <Download className="h-3.5 w-3.5" /> CSV
-          </button>
-          <button onClick={handleExportJSON} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-slate-400 rounded-lg text-xs font-semibold text-slate-600 active:scale-95 transition-all cursor-pointer">
-            <Download className="h-3.5 w-3.5" /> JSON
-          </button>
-          <button onClick={handleExportPDF} className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 border border-violet-500 rounded-lg text-xs font-semibold text-white active:scale-95 transition-all cursor-pointer">
-            <FileText className="h-3.5 w-3.5" /> PDF
-          </button>
+          <div className="w-px h-5" style={{ background: 'var(--border)' }} />
+          <button onClick={handleExportCSV}  className="btn-secondary"><Download className="h-3.5 w-3.5" /> CSV</button>
+          <button onClick={handleExportJSON} className="btn-secondary"><Download className="h-3.5 w-3.5" /> JSON</button>
+          <button onClick={handleExportPDF}  className="btn-primary" ><FileText className="h-3.5 w-3.5" /> PDF</button>
         </div>
       </div>
 
-      {/* Compare mode panel */}
+      {/* Compare panel */}
       {compareMode && (
-        <div className="mb-5 p-4 bg-slate-50 border border-violet-200 rounded-xl">
+        <div className="mb-5 p-4 rounded-xl animate-float-in"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+        >
           <div className="flex flex-col sm:flex-row gap-4 items-start">
             <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-                Compare with F2
-              </label>
+              <label className="section-label block mb-2">Compare with F2</label>
               <input
                 type="text"
                 value={compareExpr}
                 onChange={(e) => setCompareExpr(e.target.value)}
-                placeholder="e.g. A'B' or A XNOR B"
-                className={`w-full px-4 py-2.5 bg-white border rounded-lg text-slate-800 font-mono text-sm focus:outline-none focus:ring-2 transition-all ${
-                  compareError && compareExpr.trim()
-                    ? 'border-red-400 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-violet-400 focus:ring-violet-100'
-                }`}
+                placeholder="e.g.  A'B' or A XNOR B"
+                className={`ide-input${compareError && compareExpr.trim() ? ' error' : ''}`}
+                style={{ borderRadius: 8 }}
               />
               {compareError && compareExpr.trim() && (
-                <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+                <p className="text-xs mt-1.5 flex items-center gap-1"
+                  style={{ color: 'var(--error)' }}
+                >
                   <XCircle className="h-3 w-3" /> {compareError}
                 </p>
               )}
@@ -245,14 +213,12 @@ export default function TruthTable() {
             {compareAST && (
               <div className="shrink-0 pt-6">
                 {isEquivalent ? (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-700">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <span className="text-sm font-bold">Equivalent</span>
+                  <div className="badge badge-success px-4 py-2.5 text-sm font-bold">
+                    <CheckCircle2 className="h-4 w-4" /> Equivalent
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-300 rounded-xl text-red-700">
-                    <XCircle className="h-5 w-5" />
-                    <span className="text-sm font-bold">Not Equivalent</span>
+                  <div className="badge badge-error px-4 py-2.5 text-sm font-bold">
+                    <XCircle className="h-4 w-4" /> Not Equivalent
                   </div>
                 )}
               </div>
@@ -263,85 +229,93 @@ export default function TruthTable() {
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--text-dim)' }} />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filter rows by binary, row number, or output..."
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
+          placeholder="Filter rows by binary, row number, or output…"
+          className="ide-input"
+          style={{ paddingLeft: '2.5rem', borderRadius: 8 }}
         />
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-inner max-h-[520px]">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 z-10">
+      <div className="overflow-x-auto rounded-xl border max-h-[520px]"
+        style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+      >
+        <table className="truth-table">
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-16">#</th>
+              <th className="w-14">#</th>
               {allVariables.map((v, idx) => (
-                <th
-                  key={v}
+                <th key={v}
                   onClick={() => handleSort(idx)}
-                  className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-200 select-none transition-colors"
+                  className="cursor-pointer select-none"
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
                 >
-                  <div className="flex items-center gap-1">{v} <SortIcon col={idx} /></div>
+                  <div className="flex items-center gap-1">{v}<SortIcon col={idx} /></div>
                 </th>
               ))}
-              <th
-                onClick={() => handleSort('out')}
-                className="px-4 py-3 text-xs font-bold text-violet-600 uppercase tracking-wider cursor-pointer hover:bg-slate-200 select-none transition-colors border-l border-slate-200"
+              <th onClick={() => handleSort('out')}
+                className="cursor-pointer select-none"
+                style={{ color: 'var(--primary-hover)', borderLeft: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--primary-hover)')}
               >
-                <div className="flex items-center gap-1">F1 <SortIcon col="out" /></div>
+                <div className="flex items-center gap-1">F1<SortIcon col="out" /></div>
               </th>
               {compareMode && compareAST && (
                 <>
-                  <th
-                    onClick={() => handleSort('compare')}
-                    className="px-4 py-3 text-xs font-bold text-indigo-600 uppercase tracking-wider cursor-pointer hover:bg-slate-200 select-none transition-colors border-l border-slate-200"
+                  <th onClick={() => handleSort('compare')}
+                    className="cursor-pointer select-none"
+                    style={{ borderLeft: '1px solid var(--border)' }}
                   >
-                    <div className="flex items-center gap-1">F2 <SortIcon col="compare" /></div>
+                    <div className="flex items-center gap-1">F2<SortIcon col="compare" /></div>
                   </th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-16">
-                    Match
-                  </th>
+                  <th className="text-center w-14">=</th>
                 </>
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody>
             {processedRows.map((row) => (
-              <tr key={row.index} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 font-mono text-xs text-slate-400">{row.index}</td>
+              <tr key={row.index}>
+                <td style={{ color: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  {row.index}
+                </td>
                 {row.vals.map((val, idx) => (
-                  <td key={idx} className="px-4 py-3">
-                    <span className={`font-mono font-semibold ${val ? 'text-blue-600' : 'text-slate-400'}`}>{val ? '1' : '0'}</span>
+                  <td key={idx}>
+                    <span style={{
+                      color: val ? 'var(--text)' : 'var(--text-dim)',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: val ? 700 : 400,
+                    }}>
+                      {val ? '1' : '0'}
+                    </span>
                   </td>
                 ))}
-                <td className="px-4 py-3 border-l border-slate-100">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold font-mono ${
-                    row.out
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      : 'bg-slate-100 text-slate-500 border border-slate-200'
-                  }`}>
+                <td style={{ borderLeft: '1px solid var(--border)' }}>
+                  <span className={`badge ${row.out ? 'badge-primary' : 'badge-muted'}`}
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
                     {row.out ? '1' : '0'}
                   </span>
                 </td>
                 {compareMode && compareAST && row.outCompare !== null && (
                   <>
-                    <td className="px-4 py-3 border-l border-slate-100">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold font-mono ${
-                        row.outCompare
-                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
-                      }`}>
+                    <td style={{ borderLeft: '1px solid var(--border)' }}>
+                      <span className={`badge ${row.outCompare ? 'badge-primary' : 'badge-muted'}`}
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
                         {row.outCompare ? '1' : '0'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="text-center">
                       {row.out === row.outCompare
-                        ? <span className="text-emerald-600 font-bold text-sm">✓</span>
-                        : <span className="text-red-500 font-bold text-sm">✗</span>
+                        ? <span style={{ color: 'var(--success)', fontWeight: 700 }}>✓</span>
+                        : <span style={{ color: 'var(--error)',   fontWeight: 700 }}>✗</span>
                       }
                     </td>
                   </>
@@ -350,7 +324,10 @@ export default function TruthTable() {
             ))}
             {processedRows.length === 0 && (
               <tr>
-                <td colSpan={allVariables.length + (compareMode && compareAST ? 4 : 2)} className="px-6 py-10 text-center text-slate-400 text-sm">
+                <td colSpan={allVariables.length + (compareMode && compareAST ? 4 : 2)}
+                  className="text-center py-10"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   No rows matching "{searchQuery}".
                 </td>
               </tr>
@@ -358,6 +335,12 @@ export default function TruthTable() {
           </tbody>
         </table>
       </div>
+
+      {/* Row count */}
+      <p className="mt-3 text-xs text-right" style={{ color: 'var(--text-muted)' }}>
+        {processedRows.length} / {combinations.length} rows
+        {searchQuery && <> · filtered</>}
+      </p>
     </div>
   );
 }
